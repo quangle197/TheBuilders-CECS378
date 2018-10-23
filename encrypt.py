@@ -10,7 +10,7 @@ import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
-
+from cryptography.hazmat.primitives import hashes, hmac
 
 
 
@@ -58,7 +58,7 @@ def MyfileEncrypt(filepath):#filepath to the file
     out_file = open(filepath , "wb") #make a new file to write in binary
     out_file.write(encr) #write to the new file
     out_file.close() #close the file
-    return (m,iv,key,ext)#return encrypted m, iv, key and extension
+    return (encr,iv,key,ext)#return encrypted m, iv, key and extension
 
 #Decrypt a file function
 def MyfileDecrypt(filepath,key,iv):
@@ -69,5 +69,63 @@ def MyfileDecrypt(filepath,key,iv):
     out_file1.write(content ) #write a new file
     out_file1.close() #close that file
 
-#generate a key 32bit
+def MyencryptMAC(message, EncKey, HMACKey):
+    m,iv= MyEncrypt(message,EncKey) #get the m and iv from encrypt
+    
+    h= hmac.HMAC(HMACKey, hashes.SHA256(), backend=default_backend()) #make an hmac
+    h.update(m) #create the hash 
+    return (m,iv,h.finalize()) #return encrypted message and iv
+
+
+def MydecryptMAC(message,EncKey,HMACKey,iv,tag):
+    try:
+        h = hmac.HMAC(HMACKey, hashes.SHA256(), backend=default_backend())
+        h.update(message)
+        h.verify(tag)
+        m=MyDecrypt(message,EncKey,iv)
+        return m
+    except:
+        print("Invalid tag")
+    
+# =============================================================================
+# def MyfileEncryptMAC(filepath):
+#     Hkey=os.urandom(32)
+#     m,iv,key,ext=MyfileEncrypt(filepath)
+#     h= hmac.HMAC(Hkey, hashes.SHA256(), backend=default_backend())
+#     h.update(m)
+#     return (m,iv,h.finalize(),key,Hkey,ext)
+# =============================================================================
+    
+def MyfileEncryptMAC(filepath):
+    key = os.urandom(32) #make a 32 byte key
+    Hkey = os.urandom(32) #make a 32 byte hmac key
+    
+    file = open(filepath,"rb")#open the file to encrypt
+    m =file.read()# read the file
+    name,ext=os.path.splitext(filepath) #split to get the name and file extension
+    
+    (m,iv,tag)= MyencryptMAC(m,key,Hkey)
+    out_file = open(filepath , "wb") #make a new file to write in binary
+    out_file.write(m) #write to the new file
+    out_file.close() #close the file
+    return (m,iv,tag,key,Hkey,ext)
+    
+def MyfileDecryptMAC(filepath,EncKey,HMACKey,iv,tag):
+    file = open(filepath,"rb") #open a file to decrypt
+    content=file.read() #read the file
+    m=MydecryptMAC(content,EncKey,HMACKey,iv,tag)
+    out_file1 = open(filepath, "wb") #make a new file
+    out_file1.write(m) #write a new file
+    out_file1.close() #close that file
+    
+m=b"test"
 key = os.urandom(32)
+hkey= os.urandom(32)
+message,IV,tag =MyencryptMAC(m,key,hkey)
+print(message)
+message = MydecryptMAC(message,key,hkey,IV,tag)
+print(message)
+
+C,IV,tag,Enckey,HMACKey,ext=MyfileEncryptMAC("test.jpg")
+inp=input("Press enter to continue")
+MyfileDecryptMAC("test.jpg",Enckey,HMACKey,IV,tag)
