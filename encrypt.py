@@ -127,40 +127,51 @@ pubKey= 'PublicKey.pem'
 priKey= 'PrivateKey.pem'
 
 def RSAKey(pubKey,priKey):
+    #check if files exist
     if(os.path.exists(pubKey) and os.path.exists(pubKey)):
         print("Key files exist")
     else:
+        #generate private key
         private_key = rsa.generate_private_key(public_exponent=65537,\
                                                key_size=2048,\
                                                backend=default_backend())
-        
+        #generate public key
         public_key = private_key.public_key()  
     
-        pub = public_key.public_bytes(encoding=serialization.Encoding.PEM,\
-                                      format=serialization.PublicFormat.SubjectPublicKeyInfo )
-        #pub.splitlines()[0]
-        
+        #serialize private key
         pri =private_key.private_bytes(encoding=serialization.Encoding.PEM,\
                                        format=serialization.PrivateFormat.TraditionalOpenSSL,\
                                        encryption_algorithm=serialization.NoEncryption())
-        #pri.splitlines()[0]
+        pri.splitlines()[0]
         
-        pubFile=open(pubKey,"wb")
-        pubFile.write(pub)
-        pubFile.close()
+        #serialize public key
+        pub = public_key.public_bytes(encoding=serialization.Encoding.PEM,\
+                                      format=serialization.PublicFormat.SubjectPublicKeyInfo )
+        pub.splitlines()[0]
         
-        
+        #create private pem file
         priFile=open(priKey,"wb")
         priFile.write(pri)
         priFile.close()
         
+        #create public pem dile
+        pubFile=open(pubKey,"wb")
+        pubFile.write(pub)
+        pubFile.close()
+        
     
 def  MyRSAEncrypt(filepath, RSA_Publickey_filepath):
+    #encrypt the file first
      (C, IV, tag, Enckey, HMACKey, ext)= MyfileEncryptMAC(filepath)
+     
+     #concatenate encrypt key and hmac key
      key = Enckey + HMACKey
+     
+     #open the public key pem file
      with open(pubKey, "rb") as key_file:
          pub = serialization.load_pem_public_key(key_file.read(),\
                                                           backend=default_backend())
+     #encrypt the key
      RSACipher = pub.encrypt(key,\
                                    asymmetric.padding.OAEP(\
                                                 mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),\
@@ -171,19 +182,26 @@ def  MyRSAEncrypt(filepath, RSA_Publickey_filepath):
     
 
 def MyRSADecrypt(RSACipher, C, IV, tag, ext, RSA_Privatekey_filepath):
+    #open the private key pem file
     with open(priKey, "rb") as key_file:
          private = serialization.load_pem_private_key(key_file.read(),\
                                                           password=None,\
                                                           backend=default_backend())
+    #decrypt to get the enckey and hmackey
     key= private.decrypt(RSACipher,\
                              asymmetric.padding.OAEP(mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),\
                                           algorithm=hashes.SHA256(),\
                                           label=None))
+    #first 32 bytes are enckey
     EncKey=key[:32]
+    #last 32 byets are hmac key
     HMACKey= key[-32:]
     
+    #decrypt the cipher
     m=MydecryptMAC(C,EncKey,HMACKey,IV,tag)
-    out_file1 = open("Decyptedfile", "wb") #make a new file
+    
+    #write the file
+    out_file1 = open("Decyptedfile"+ext, "wb") #make a new file
     out_file1.write(m) #write a new file
     out_file1.close() #close that file
     
@@ -193,7 +211,7 @@ def MyRSADecrypt(RSACipher, C, IV, tag, ext, RSA_Privatekey_filepath):
 
 #C,IV,tag,Enckey,HMACKey,ext=MyfileEncryptMAC("test.jpg")
 #inp=input("Press enter to continue")
-#RSAKey(pubKey,priKey)
+RSAKey(pubKey,priKey)
 
 RSACipher,C, IV, tag, ext= MyRSAEncrypt("test.jpg",pubKey)
 MyRSADecrypt(RSACipher, C, IV, tag, ext, priKey)
